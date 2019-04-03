@@ -16,6 +16,7 @@
 #include <vector>
 #include <algorithm>
 #include <random>
+#include <chrono>
 #include <stdint.h>
 #define min min    /* prevent xfs.h from defining min() as a macro */
 #include <xfs/xfs.h>
@@ -57,6 +58,9 @@ void test_concurrent_append(io_context_t ioctx, int fd, unsigned iodepth, std::s
     std::iota(iocbps.begin(), iocbps.end(), iocbs.data());
     auto ioevs = std::vector<io_event>(iodepth);
     std::random_device random_device;
+ 
+    auto start = std::chrono::high_resolution_clock::now();
+
     while (completed < nr) {
         auto i = unsigned(0);
         while (initiated < nr && current_depth < iodepth) {
@@ -73,10 +77,16 @@ void test_concurrent_append(io_context_t ioctx, int fd, unsigned iodepth, std::s
         current_depth -= n;
         completed += n;
     }
+
+    using float_ms = std::chrono::duration<float, std::chrono::milliseconds::period>;
+    
+    auto dur = std::chrono::high_resolution_clock::now() - start;
+    auto time = std::chrono::duration_cast<float_ms>(dur);
+
     auto rate = float(ctxsw) / nr;
     auto verdict = rate < 0.1 ? "GOOD" : "BAD";
     std::cout << "context switch per appending io (mode " << mode << ", iodepth " << iodepth << "): " << rate
-          << " (" << verdict << ")\n";
+          << " (" << verdict << ")"  << " (" << time.count() << "ms)" << std::endl;
     auto ptr = mmap(nullptr, nr * block_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     auto incore = std::vector<uint8_t>(nr);
     mincore(ptr, nr * block_size, incore.data());
