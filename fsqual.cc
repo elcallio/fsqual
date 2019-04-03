@@ -20,6 +20,8 @@
 #define min min    /* prevent xfs.h from defining min() as a macro */
 #include <xfs/xfs.h>
 
+static int nr = 10000;
+
 template <typename Counter, typename Func>
 typename std::result_of<Func()>::type
 with_ctxsw_counting(Counter& counter, Func&& func) {
@@ -42,7 +44,6 @@ with_ctxsw_counting(Counter& counter, Func&& func) {
 }
 
 void test_concurrent_append(io_context_t ioctx, int fd, unsigned iodepth, std::string mode) {
-    auto nr = 10000;
     auto bufsize = 4096;
     auto ctxsw = 0;
     auto buf = aligned_alloc(4096, 4096);
@@ -126,6 +127,10 @@ void test_dio_info() {
 }
 
 int main(int ac, char** av) {
+    if (ac > 1) {
+        nr = std::stoi(av[1]);
+    }
+    std::cout << "Using " << nr << " iterations..." << std::endl;
     test_dio_info();
     run_test([] (io_context_t ioctx, int fd) { test_concurrent_append(ioctx, fd, 1, "size-changing"); });
     run_test([] (io_context_t ioctx, int fd) { test_concurrent_append(ioctx, fd, 3, "size-changing"); });
