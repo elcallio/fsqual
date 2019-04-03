@@ -87,11 +87,16 @@ void test_concurrent_append_size_unchanging(io_context_t ioctx, int fd, unsigned
     test_concurrent_append(ioctx, fd, iodepth, mode);
 }
 
-void run_test(std::function<void (io_context_t ioctx, int fd)> func) {
+void test_concurrent_append_size_allocated(io_context_t ioctx, int fd, unsigned iodepth, std::string mode) {
+    fallocate(fd, 0, 0, off_t(1) << 30);
+    test_concurrent_append(ioctx, fd, iodepth, mode);
+}
+
+void run_test(std::function<void (io_context_t ioctx, int fd)> func, int flags = 0) {
     io_context_t ioctx = {};
     io_setup(128, &ioctx);
     auto fname = "fsqual.tmp";
-    int fd = open(fname, O_CREAT|O_EXCL|O_RDWR|O_DIRECT, 0600);
+    int fd = open(fname, flags|O_CREAT|O_EXCL|O_RDWR|O_DIRECT, 0600);
     fsxattr attr = {};
     attr.fsx_xflags |= XFS_XFLAG_EXTSIZE;
     attr.fsx_extsize = 32 << 20; // 32MB
@@ -126,5 +131,15 @@ int main(int ac, char** av) {
     run_test([] (io_context_t ioctx, int fd) { test_concurrent_append(ioctx, fd, 3, "size-changing"); });
     run_test([] (io_context_t ioctx, int fd) { test_concurrent_append_size_unchanging(ioctx, fd, 3, "size-unchanging"); });
     run_test([] (io_context_t ioctx, int fd) { test_concurrent_append_size_unchanging(ioctx, fd, 7, "size-unchanging"); });
+    run_test([] (io_context_t ioctx, int fd) { test_concurrent_append_size_allocated(ioctx, fd, 3, "size-allocated"); });
+    run_test([] (io_context_t ioctx, int fd) { test_concurrent_append_size_allocated(ioctx, fd, 7, "size-allocated"); });
+
+    run_test([] (io_context_t ioctx, int fd) { test_concurrent_append(ioctx, fd, 1, "size-changing (O_DSYNC)"); }, O_DSYNC);
+    run_test([] (io_context_t ioctx, int fd) { test_concurrent_append(ioctx, fd, 3, "size-changing (O_DSYNC)"); }, O_DSYNC);
+    run_test([] (io_context_t ioctx, int fd) { test_concurrent_append_size_unchanging(ioctx, fd, 3, "size-unchanging (O_DSYNC)"); }, O_DSYNC);
+    run_test([] (io_context_t ioctx, int fd) { test_concurrent_append_size_unchanging(ioctx, fd, 7, "size-unchanging (O_DSYNC)"); }, O_DSYNC);
+    run_test([] (io_context_t ioctx, int fd) { test_concurrent_append_size_allocated(ioctx, fd, 3, "size-allocated (O_DSYNC)"); }, O_DSYNC);
+    run_test([] (io_context_t ioctx, int fd) { test_concurrent_append_size_allocated(ioctx, fd, 7, "size-allocated (O_DSYNC)"); }, O_DSYNC);
+
     return 0;
 }
