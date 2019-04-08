@@ -21,7 +21,7 @@
 #define min min    /* prevent xfs.h from defining min() as a macro */
 #include <xfs/xfs.h>
 
-static int nr = 10000;
+static size_t nr = 10000;
 static constexpr size_t block_size = 4096;
 static constexpr size_t alignment = block_size;
 
@@ -70,10 +70,20 @@ void test_concurrent_append(io_context_t ioctx, int fd, unsigned iodepth, std::s
         std::shuffle(iocbs.begin(), iocbs.begin() + i, random_device);
         if (i) {
             with_ctxsw_counting(ctxsw, [&] {
-                io_submit(ioctx, i, iocbps.data());
+                if (io_submit(ioctx, i, iocbps.data()) < 0) {
+                    throw std::runtime_error("Could not submit io request");
+                }
             });
         }
         auto n = io_getevents(ioctx, 1, iodepth, ioevs.data(), nullptr);
+        if (n < 0) {
+            throw std::runtime_error("Error getting ioevents");
+        }
+        std::for_each(ioevs.begin(), ioevs.begin() + n, [](io_event& e) {
+            if (e.res <= 0) {
+                throw std::runtime_error("IO error");
+            }
+        });
         current_depth -= n;
         completed += n;
     }
