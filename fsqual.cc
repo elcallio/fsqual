@@ -111,7 +111,7 @@ void test_concurrent_append_size_unchanging(io_context_t ioctx, int fd, unsigned
 }
 
 void test_concurrent_append_size_allocated(io_context_t ioctx, int fd, unsigned iodepth, std::string mode) {
-    fallocate(fd, 0, 0, nr * block_size);
+    fallocate(fd, FALLOC_FL_ZERO_RANGE, 0, nr * block_size);
     test_concurrent_append(ioctx, fd, iodepth, mode);
 }
 
